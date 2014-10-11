@@ -38,8 +38,10 @@ func Default(orig, value interface{}, optionValue string) (interface{}, error) {
 // modified after being set.  It will return an error if orig is
 // non-empty and does not match the new value from the request.
 func Immutable(orig, value interface{}, optionValue string) (interface{}, error) {
-	if orig != reflect.Zero(reflect.TypeOf(orig)).Interface() && orig != value {
-		return nil, errors.New("Value is immutable once set")
+	if optionValue == "true" {
+		if orig != reflect.Zero(reflect.TypeOf(orig)).Interface() && orig != value {
+			return nil, errors.New("Value is immutable once set")
+		}
 	}
 	return value, nil
 }
