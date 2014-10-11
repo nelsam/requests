@@ -7,29 +7,6 @@ import (
 	"strconv"
 )
 
-// unmarshallers checks a pointer to a struct field to see if the
-// field or its pointer implements PreUnmarshaller, Unmarshaller,
-// and/or PostUnmarshaller.  Return values will be nil for any types
-// the target does not implement.
-func unmarshallers(target interface{}) (PreUnmarshaller, Unmarshaller, PostUnmarshaller) {
-	preUnmarshaller, hasPreUnmarshal := target.(PreUnmarshaller)
-	unmarshaller, hasUnmarshal := target.(Unmarshaller)
-	postUnmarshaller, hasPostUnmarshal := target.(PostUnmarshaller)
-
-	// If interfaces weren't found, try again with the Elem value
-	targetElem := reflect.ValueOf(target).Elem().Interface()
-	if !hasPreUnmarshal {
-		preUnmarshaller, _ = targetElem.(PreUnmarshaller)
-	}
-	if !hasUnmarshal {
-		unmarshaller, _ = targetElem.(Unmarshaller)
-	}
-	if !hasPostUnmarshal {
-		postUnmarshaller, _ = targetElem.(PostUnmarshaller)
-	}
-	return preUnmarshaller, unmarshaller, postUnmarshaller
-}
-
 // set is a simple slice of unique strings.
 type set []string
 
@@ -118,20 +95,19 @@ func (request *Request) Unmarshal(target interface{}) (unmarshalErr error) {
 		return err
 	}
 
-	preUnmarshaller, unmarshaller, postUnmarshaller := unmarshallers(target)
-	if preUnmarshaller != nil {
+	if preUnmarshaller, ok := target.(PreUnmarshaller); ok {
 		if unmarshalErr = preUnmarshaller.PreUnmarshal(); unmarshalErr != nil {
 			return
 		}
 	}
-	if postUnmarshaller != nil {
+	if postUnmarshaller, ok := target.(PostUnmarshaller); ok {
 		defer func() {
 			if unmarshalErr == nil {
 				unmarshalErr = postUnmarshaller.PostUnmarshal()
 			}
 		}()
 	}
-	if unmarshaller != nil {
+	if unmarshaller, ok := target.(Unmarshaller); ok {
 		return unmarshaller.Unmarshal(params)
 	}
 
