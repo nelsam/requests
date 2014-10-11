@@ -1,3 +1,6 @@
+[![Build Status](https://drone.io/github.com/go-requests/requests/status.png)](https://drone.io/github.com/go-requests/requests/latest)
+[![Coverage Status](https://img.shields.io/coveralls/go-requests/requests.svg)](https://coveralls.io/r/go-requests/requests?branch=master)
+
 requests
 ========
 
