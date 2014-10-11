@@ -22,12 +22,11 @@ func (errs InputErrors) Error() string {
 	return buff.String()
 }
 
-// Set takes an input and an error, and sets the error to the input if
-// the error is non-nil.  The return value will be true if err is
-// non-nil, false otherwise.
+// Set executes errs[input] = err.  Returns true if err is non-nil,
+// false otherwise.
 func (errs InputErrors) Set(input string, err error) bool {
 	errs[input] = err
-	return err == nil
+	return err != nil
 }
 
 // Merge merges all keys and values from newErrs into errs.  Any
@@ -51,11 +50,9 @@ func (errs InputErrors) HasErrors() bool {
 	return false
 }
 
-// Errors returns a map of all input names that have a non-nil error
-// value.  Any input that has a nil error value will not be included
-// in the return value.
-func (errs InputErrors) Errors() map[string]error {
-	errors := make(map[string]error)
+// Errors returns a clone of errs with all nil error indexes removed.
+func (errs InputErrors) Errors() InputErrors {
+	errors := make(InputErrors)
 	for input, err := range errs {
 		if err != nil {
 			errors[input] = err

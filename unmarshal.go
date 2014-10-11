@@ -136,6 +136,8 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value) 
 	defer func() {
 		if !parseErrs.HasErrors() {
 			parseErrs = nil
+		} else {
+			parseErrs = parseErrs.
 		}
 	}()
 
