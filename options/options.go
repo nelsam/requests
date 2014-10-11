@@ -7,15 +7,13 @@ import (
 	"reflect"
 )
 
-var RequiredErr = errors.New("Required value is nil")
-
 // Required is an option func that ensures a non-nil value was passed
 // along in the request.  It does not ensure that the value is
 // non-empty.
 func Required(orig, value interface{}, optionValue string) (interface{}, error) {
 	if optionValue == "true" {
 		if value == nil {
-			return nil, RequiredErr
+			return nil, errors.New("Required value has nil input")
 		}
 	}
 	return value, nil
