@@ -51,10 +51,14 @@ func (errs InputErrors) HasErrors() bool {
 }
 
 // Errors returns a clone of errs with all nil error indexes removed.
+// If there are no non-nil errors, this method will return nil.
 func (errs InputErrors) Errors() InputErrors {
-	errors := make(InputErrors)
+	var errors InputErrors
 	for input, err := range errs {
 		if err != nil {
+			if errors == nil {
+				errors = make(InputErrors)
+			}
 			errors[input] = err
 		}
 	}

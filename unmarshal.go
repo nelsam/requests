@@ -134,11 +134,10 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value) 
 
 	parseErrs = make(InputErrors)
 	defer func() {
-		if !parseErrs.HasErrors() {
-			parseErrs = nil
-		} else {
-			parseErrs = parseErrs.
-		}
+		// After parsing all input, get rid of nil errors in the input
+		// error map, and set parseErrs to nil if there are no non-nil
+		// errors.
+		parseErrs = parseErrs.Errors()
 	}()
 
 	targetType := targetValue.Type()
