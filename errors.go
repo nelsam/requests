@@ -30,6 +30,9 @@ func (errs InputErrors) Set(input string, err error) bool {
 	return err == nil
 }
 
+// Merge merges all keys and values from newErrs into errs.  Any
+// values in newErrs that are also in errs will overwrite the values
+// in errs.
 func (errs InputErrors) Merge(newErrs InputErrors) InputErrors {
 	for input, err := range newErrs {
 		errs[input] = err
@@ -37,6 +40,8 @@ func (errs InputErrors) Merge(newErrs InputErrors) InputErrors {
 	return errs
 }
 
+// HasErrors returns whether or not any of the errors in errs are
+// non-nil.
 func (errs InputErrors) HasErrors() bool {
 	for _, err := range errs {
 		if err != nil {
@@ -44,4 +49,17 @@ func (errs InputErrors) HasErrors() bool {
 		}
 	}
 	return false
+}
+
+// Errors returns a map of all input names that have a non-nil error
+// value.  Any input that has a nil error value will not be included
+// in the return value.
+func (errs InputErrors) Errors() map[string]error {
+	errors := make(map[string]error)
+	for input, err := range errs {
+		if err != nil {
+			errors[input] = err
+		}
+	}
+	return errors
 }
