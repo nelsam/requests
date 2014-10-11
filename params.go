@@ -65,13 +65,13 @@ func (request *Request) Params() (map[string]interface{}, error) {
 // * application/x-www-form-urlencoded (or an empty Content-Type)
 //
 // ** The return value for this type will be the same as
-//    "net/http".Request.PostForm after calling ParseForm.
+// "net/http".Request.PostForm after calling ParseForm.
 //
 // * multipart/form-data
 //
 // ** The return value for this type will be the same as
-//    "net/http".Request.MultipartForm after calling
-//    ParseMultipartForm.
+// "net/http".Request.MultipartForm after calling
+// ParseMultipartForm.
 func ParseBody(request *http.Request) (interface{}, error) {
 	// Handle form data types
 	contentType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
@@ -115,13 +115,13 @@ func ParseBody(request *http.Request) (interface{}, error) {
 // * application/x-www-form-urlencoded (or an empty Content-Type)
 //
 // ** Each value in request.PostForm that has a len() of 1 will be
-//    stored instead as the zeroeth index of the value.
+// stored instead as the zeroeth index of the value.
 //
 // * multipart/form-data
 //
 // ** In addition to the above, files will be stored at the same
-//    level as values.  Each value in the resulting map could contain
-//    both string and *"mime/multipart".FileHeader values.
+// level as values.  Each value in the resulting map could contain
+// both string and *"mime/multipart".FileHeader values.
 //
 // The resulting code to parse a form may look like the following:
 //
