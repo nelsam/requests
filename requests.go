@@ -6,20 +6,10 @@
 //
 //     err := requests.New(request).Unmarshal(structPtr)
 //
-// For parameter parsing, the requests package uses the following
-// logic:
-//
-//   1. A map[string]interface{} is created to store parameters.
-//   2. If there are URL parameters, they are appended to the
-//      map[string]interface{} using standard urlencode unmarshalling.
-//   3. If the request body is non-empty:
-//     1. Look up a codec matching the request's Content-Type header.
-//     2. If no matching codec is found, fall back on urlencoded data.
-//     3. Unmarshal values from the request body and append them to the
-//        map[string]interface{}.
-//
-// The return value is the map[string]interface{} generated during
-// that process.
+// Parameters will be loaded from the request body based on the
+// request's Content-Type header.  Some attempts are made to unify
+// data structure, to make it easier to treat all requests the same
+// (regardless of Content-Type).
 //
 // For the Unmarshal process, the requests package uses a combination
 // of reflection (to check field tags) and interfaces to figure out
@@ -30,12 +20,15 @@ package requests
 
 import "net/http"
 
+// A Request is a type that stores data about an HTTP request and
+// contains methods for reading that request's body.
 type Request struct {
 	httpRequest *http.Request
 	body        interface{}
 	params      map[string]interface{}
 }
 
+// New creates a new *Request based on the request parameter.
 func New(request *http.Request) *Request {
 	return &Request{httpRequest: request}
 }
