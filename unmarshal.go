@@ -37,11 +37,15 @@ func (s set) add(values ...string) set {
 //
 // * All field tags are considered to be of the format
 // name,option1,option2,...
+//
 // * Options will *only* be parsed from the "request" tag.
+//
 // * By default, name will only be checked in the "request" tag, but
 // you can add fallback tag names using AddFallbackTag.
+//
 // * If no non-empty name is found using field tags, the lowercase
 // field name will be used instead.
+//
 // * Once a name is found, if the name is "-", then the field will be
 // treated as if it does not exist.
 //
