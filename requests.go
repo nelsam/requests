@@ -9,14 +9,14 @@
 // For parameter parsing, the requests package uses the following
 // logic:
 //
-// 1. A map[string]interface{} is created to store parameters.
-// 2. If there are URL parameters, they are appended to the
-// map[string]interface{} using standard urlencode unmarshalling.
-// 3. If the request body is non-empty:
-//   1. Look up a codec matching the request's Content-Type header.
-//   2. If no matching codec is found, fall back on urlencoded data.
-//   3. Unmarshal values from the request body and append them to the
-//   map[string]interface{}.
+//   1. A map[string]interface{} is created to store parameters.
+//   2. If there are URL parameters, they are appended to the
+//      map[string]interface{} using standard urlencode unmarshalling.
+//   3. If the request body is non-empty:
+//     1. Look up a codec matching the request's Content-Type header.
+//     2. If no matching codec is found, fall back on urlencoded data.
+//     3. Unmarshal values from the request body and append them to the
+//        map[string]interface{}.
 //
 // The return value is the map[string]interface{} generated during
 // that process.
