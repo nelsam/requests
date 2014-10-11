@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,10 @@ func TestUnusedFields(t *testing.T) {
 		}
 	}
 	assert.Equal(2, unmatched)
+	assert.True(strings.HasPrefix(err.Error(),
+		"Request fields found with no matching struct fields"))
+	assert.True(strings.Contains(err.Error(), "email"))
+	assert.True(strings.Contains(err.Error(), "about"))
 
 	err = new(UnusedFields)
 	err.params = map[string]interface{}{
@@ -46,4 +51,8 @@ func TestUnusedFields(t *testing.T) {
 	}
 	err.matched = set{"name", "pass", "email", "about"}
 	assert.False(err.HasMissing())
+	assert.False(strings.Contains(err.Error(), "name"))
+	assert.False(strings.Contains(err.Error(), "pass"))
+	assert.False(strings.Contains(err.Error(), "email"))
+	assert.False(strings.Contains(err.Error(), "about"))
 }
