@@ -63,12 +63,15 @@ func (request *Request) Params() (map[string]interface{}, error) {
 // used:
 //
 // * application/x-www-form-urlencoded (or an empty Content-Type)
-//   * The return value for this type will be the same as
-//   "net/http".Request.PostForm after calling ParseForm.
+//
+// ** The return value for this type will be the same as
+//    "net/http".Request.PostForm after calling ParseForm.
+//
 // * multipart/form-data
-//   * The return value for this type will be the same as
-//   "net/http".Request.MultipartForm after calling
-//   ParseMultipartForm.
+//
+// ** The return value for this type will be the same as
+//    "net/http".Request.MultipartForm after calling
+//    ParseMultipartForm.
 func ParseBody(request *http.Request) (interface{}, error) {
 	// Handle form data types
 	contentType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
@@ -110,12 +113,15 @@ func ParseBody(request *http.Request) (interface{}, error) {
 // two exceptions:
 //
 // * application/x-www-form-urlencoded (or an empty Content-Type)
-//   * Each value in request.PostForm that has a len() of 1 will be
-//   stored instead as the zeroeth index of the value.
+//
+// ** Each value in request.PostForm that has a len() of 1 will be
+//    stored instead as the zeroeth index of the value.
+//
 // * multipart/form-data
-//   * In addition to the above, files will be stored at the same
-//   level as values.  Each value in the resulting map could contain
-//   both string and *"mime/multipart".FileHeader values.
+//
+// ** In addition to the above, files will be stored at the same
+//    level as values.  Each value in the resulting map could contain
+//    both string and *"mime/multipart".FileHeader values.
 //
 // The resulting code to parse a form may look like the following:
 //
@@ -133,11 +139,6 @@ func ParseBody(request *http.Request) (interface{}, error) {
 //         }
 //     }
 //
-// To be honest, I *hate* dealing with urlencoded or multipart form
-// data.  The ParseParams function here is designed solely to unify
-// form data behavior with json and other types, so that I don't need
-// specialized code to handle all the []string and
-// []*multipart.FileHeader values when *most* of them are length 1.
 func ParseParams(request *http.Request) (map[string]interface{}, error) {
 	if request.Body == nil {
 		return nil, nil
