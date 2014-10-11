@@ -222,5 +222,8 @@ func name(field reflect.StructField) string {
 func nameFromTag(field reflect.StructField, tagName string) string {
 	name := field.Tag.Get(tagName)
 	nameEnd := strings.IndexRune(name, ',')
+	if nameEnd == -1 {
+		return name
+	}
 	return name[:nameEnd]
 }
