@@ -59,7 +59,9 @@ func (s set) add(values ...string) set {
 //
 // An error will be returned if the target type is not a pointer to a
 // struct, or if the target implements PreUnmarshaller, Unmarshaller,
-// or PostUnmarshaller and the corresponding methods fail.
+// or PostUnmarshaller and the corresponding methods fail.  An
+// UnusedFields error will be returned if fields in the request had no
+// corresponding fields on the target struct.
 //
 // Any errors encountered while attempting to apply input values to
 // the target's fields will be stored in an error of type InputErrors.
