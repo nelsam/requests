@@ -29,8 +29,8 @@ func (s set) add(values ...string) set {
 	return s
 }
 
-// UnmarshalParams unmarshals a request to a struct, using field tags
-// to locate corresponding values in the request and check/parse them
+// Unmarshal unmarshals a request to a struct, using field tags to
+// locate corresponding values in the request and check/parse them
 // before assigning them to struct fields.  It acts similar to json's
 // Unmarshal when used on a struct, but works with any codec
 // registered with AddCodec().  Field tags are used as follows:
