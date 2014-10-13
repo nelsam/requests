@@ -31,8 +31,12 @@ func (s set) add(values ...string) set {
 
 // UnmarshalReplace performs the same process as Unmarshal, except
 // that values not found in the request will be updated to their zero
-// value.  For example, if foo.Bar == "baz", Unmarshal would leave it
-// as "baz", but UnmarshalReplace will update it to "".
+// value.  For example, if foo.Bar == "baz" and foo.Bar has no
+// corresponding data in a request, Unmarshal would leave it as "baz",
+// but UnmarshalReplace will update it to "".
+//
+// Exceptions are made for unexported fields and fields which are
+// found to have a name of "-".  Those are left alone.
 func (request *Request) UnmarshalReplace(target interface{}) error {
 	return request.unmarshal(target, true)
 }
@@ -41,9 +45,7 @@ func (request *Request) UnmarshalReplace(target interface{}) error {
 // locate corresponding values in the request and check/parse them
 // before assigning them to struct fields.  It acts similar to json's
 // Unmarshal when used on a struct, but works with any codec
-// registered with AddCodec().  If a value is not found in the
-// request for a given field, then the current value of the field will
-// be used.
+// registered with AddCodec().
 //
 // Field tags are used as follows:
 //
@@ -64,6 +66,10 @@ func (request *Request) UnmarshalReplace(target interface{}) error {
 // For an explanation on how options work, see the documentation for
 // RegisterOption.  For a list of tag options built in to this
 // library, see the options package in this package.
+//
+// Fields which have no data in the request will be left as their
+// current value.  They will still be passed through the option parser
+// for the purposes of options like "required".
 //
 // Fields which implement Receiver will have their Receive method
 // called using the value from the request after calling all
