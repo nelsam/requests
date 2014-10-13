@@ -29,11 +29,23 @@ func (s set) add(values ...string) set {
 	return s
 }
 
+// UnmarshalReplace performs the same process as Unmarshal, except
+// that values not found in the request will be updated to their zero
+// value.  For example, if foo.Bar == "baz", Unmarshal would leave it
+// as "baz", but UnmarshalReplace will update it to "".
+func (request *Request) UnmarshalReplace(target interface{}) error {
+	return request.unmarshal(target, true)
+}
+
 // Unmarshal unmarshals a request to a struct, using field tags to
 // locate corresponding values in the request and check/parse them
 // before assigning them to struct fields.  It acts similar to json's
 // Unmarshal when used on a struct, but works with any codec
-// registered with AddCodec().  Field tags are used as follows:
+// registered with AddCodec().  If a value is not found in the
+// request for a given field, then the current value of the field will
+// be used.
+//
+// Field tags are used as follows:
 //
 // * All field tags are considered to be of the format
 // name,option1,option2,...
@@ -91,7 +103,13 @@ func (s set) add(values ...string) set {
 //         return target, nil
 //     }
 //
-func (request *Request) Unmarshal(target interface{}) (unmarshalErr error) {
+func (request *Request) Unmarshal(target interface{}) error {
+	return request.unmarshal(target, false)
+}
+
+// unmarshal performes all of the logic for Unmarshal and
+// UnmarshalReplace.
+func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalErr error) {
 	targetValue := reflect.ValueOf(target)
 	if targetValue.Kind() != reflect.Ptr || targetValue.Elem().Kind() != reflect.Struct {
 		return errors.New("The value passed to Unmarshal must be a pointer to a struct")
@@ -117,7 +135,7 @@ func (request *Request) Unmarshal(target interface{}) (unmarshalErr error) {
 		return unmarshaller.Unmarshal(params)
 	}
 
-	matchedFields, err := unmarshalToValue(params, targetValue)
+	matchedFields, err := unmarshalToValue(params, targetValue, replace)
 	if err != nil {
 		return err
 	}
@@ -135,7 +153,7 @@ func (request *Request) Unmarshal(target interface{}) (unmarshalErr error) {
 // unmarshalToValue is a helper for UnmarshalParams, which keeps track
 // of the total number of fields matched in a request and which fields
 // were missing from a request.
-func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value) (matchedFields set, parseErrs InputErrors) {
+func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, replace bool) (matchedFields set, parseErrs InputErrors) {
 	matchedFields = make(set, 0, len(params))
 
 	parseErrs = make(InputErrors)
@@ -158,7 +176,7 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value) 
 				fieldValue = fieldValue.Elem()
 			}
 			if fieldValue.Kind() == reflect.Struct {
-				embeddedFields, newErrs := unmarshalToValue(params, fieldValue)
+				embeddedFields, newErrs := unmarshalToValue(params, fieldValue, replace)
 				if newErrs != nil {
 					// Override input errors in the anonymous field
 					// with input errors in the child.  Non-nil
@@ -182,14 +200,23 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value) 
 			value, ok := params[name]
 			if ok {
 				matchedFields = matchedFields.add(name)
-			} else if defaulter, ok := fieldValue.Interface().(Defaulter); ok {
-				value = defaulter.DefaultValue()
 			} else {
-				// Here, use the current value of the field, so that
-				// options like default and required won't act as if
-				// the field is not set when the original value is
-				// non-empty.
-				value = fieldValue.Interface()
+				// If we're not replacing the value, use the field's
+				// current value.  If we are, use the field's zero
+				// value.
+				zero := reflect.Zero(fieldValue.Type())
+				if replace {
+					value = zero
+				} else {
+					value = fieldValue.Interface()
+				}
+				if value == zero {
+					// The value is empty, so see if its default can
+					// be loaded.
+					if defaulter, ok := value.(Defaulter); ok {
+						value = defaulter.DefaultValue()
+					}
+				}
 			}
 			var inputErr error
 			value, inputErr = ApplyOptions(field, fieldValue.Interface(), value)
