@@ -10,9 +10,9 @@ import (
 type Fallback struct {
 	First  string `db:"first_field"`
 	Second string `response:"second_field"`
-	Third  string `db:"-" response:"third_field"`
-	Fourth string `db:"fourth_field" response:"-"`
-	Fifth  string `db:"-" response:"-" request:"fifth_field"`
+	Third  string `db:"-" response:"third_field,responseoption"`
+	Fourth string `db:"fourth_field,dboption" response:"-"`
+	Fifth  string `db:"-" response:"-" request:"fifth_field,requestoption"`
 }
 
 func fallbackFields(structType reflect.Type) []string {
@@ -67,4 +67,12 @@ func TestTags_Fallbacks(t *testing.T) {
 	expected[2] = "third_field"
 	expected[3] = "-"
 	assert.Equal(expected, reverseFallbackFields)
+}
+
+func TestTags_Fallbacks_NoDuplicates(t *testing.T) {
+	AddFallbackTag("db")
+	expectedLength = len(fallbackTags)
+	AddFallbackTag("db")
+	assert.Equal(t, expectedLength, len(fallbackTags))
+
 }
