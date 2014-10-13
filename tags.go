@@ -176,14 +176,19 @@ func tagOptions(field reflect.StructField) []*tagOption {
 		// Skip over the ',' character
 		startIdx++
 		endIdx := strings.IndexRune(tag[startIdx:], ',')
+		if endIdx < 0 {
+			endIdx = len(tag)
+		}
 		optionNameEnd := strings.IndexRune(tag[startIdx:endIdx], '=')
+		optionNameStart := optionNameEnd + 1
 		if optionNameEnd < 0 {
 			optionNameEnd = endIdx
+			optionNameStart = endIdx
 		}
 
 		option := new(tagOption)
 		option.name = tag[startIdx:optionNameEnd]
-		option.value = tag[optionNameEnd+1 : endIdx]
+		option.value = tag[optionNameStart:endIdx]
 		if option.value == "" {
 			option.value = "true"
 		}

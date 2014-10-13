@@ -120,6 +120,7 @@ func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalEr
 	if targetValue.Kind() != reflect.Ptr || targetValue.Elem().Kind() != reflect.Struct {
 		return errors.New("The value passed to Unmarshal must be a pointer to a struct")
 	}
+	targetValue = targetValue.Elem()
 	params, err := request.Params()
 	if err != nil {
 		return err
