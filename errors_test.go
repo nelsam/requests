@@ -36,4 +36,7 @@ func TestInputErrors(t *testing.T) {
 	assert.Equal(3, len(errs))
 	assert.Equal("Overriding test error", errs["test"].Error())
 	assert.NotEqual(emptyMessage, errs.Error())
+
+	errs = nil
+	assert.Equal(newErrs, errs.Merge(newErrs))
 }
