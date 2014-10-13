@@ -29,10 +29,14 @@ func (errs InputErrors) Set(input string, err error) bool {
 	return err != nil
 }
 
-// Merge merges all keys and values from newErrs into errs.  Any
-// values in newErrs that are also in errs will overwrite the values
-// in errs.
+// Merge merges errs and newErrs, returning the resulting map. If errs
+// is nil, nothing will be done and newErrs will be returned. If errs
+// is non-nil, all keys and values in newErrs will be added to errs,
+// and you can safely ignore the return value.
 func (errs InputErrors) Merge(newErrs InputErrors) InputErrors {
+	if errs == nil {
+		return newErrs
+	}
 	for input, err := range newErrs {
 		errs[input] = err
 	}
