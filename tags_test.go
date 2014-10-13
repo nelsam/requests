@@ -74,5 +74,4 @@ func TestTags_Fallbacks_NoDuplicates(t *testing.T) {
 	expectedLength := len(fallbackTags)
 	AddFallbackTag("db")
 	assert.Equal(t, expectedLength, len(fallbackTags))
-
 }
