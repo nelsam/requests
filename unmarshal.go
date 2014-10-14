@@ -142,9 +142,9 @@ func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalEr
 		return unmarshaller.Unmarshal(params)
 	}
 
-	matchedFields, err := unmarshalToValue(params, targetValue, replace)
-	if err != nil {
-		return err
+	matchedFields, inputErrs := unmarshalToValue(params, targetValue, replace)
+	if len(inputErrs) > 0 {
+		return inputErrs
 	}
 
 	unused := &UnusedFields{
@@ -162,12 +162,9 @@ func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalEr
 // were missing from a request.
 func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, replace bool) (matchedFields set, parseErrs InputErrors) {
 	matchedFields = make(set, 0, len(params))
-
 	parseErrs = make(InputErrors)
 	defer func() {
-		// After parsing all input, get rid of nil errors in the input
-		// error map, and set parseErrs to nil if there are no non-nil
-		// errors.
+		// Clean up any nil errors from the error map.
 		parseErrs = parseErrs.Errors()
 	}()
 
@@ -204,8 +201,8 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 				continue
 			}
 
-			value, ok := params[name]
-			if ok {
+			value, fromParams := params[name]
+			if fromParams {
 				matchedFields = matchedFields.add(name)
 			} else {
 				// If we're not replacing the value, use the field's
@@ -213,11 +210,19 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 				// value.
 				zero := reflect.Zero(fieldValue.Type())
 				if replace {
-					value = zero
+					if zero.IsNil() {
+						value = nil
+					} else {
+						value = zero.Interface()
+					}
 				} else {
-					value = fieldValue.Interface()
+					if fieldValue.IsNil() {
+						value = nil
+					} else {
+						value = fieldValue.Interface()
+					}
 				}
-				if value == zero {
+				if value == nil || value == zero.Interface() {
 					// The value is empty, so see if its default can
 					// be loaded.
 					if defaulter, ok := value.(Defaulter); ok {
@@ -230,29 +235,13 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 			if parseErrs.Set(name, inputErr) {
 				continue
 			}
-			parseErrs.Set(name, setValue(fieldValue, value))
+			parseErrs.Set(name, setValue(fieldValue, value, fromParams))
 		}
 	}
 	return
 }
 
-// setValue takes a target and a value, and updates the target to
-// match the value.
-func setValue(target reflect.Value, value interface{}) (parseErr error) {
-	if value == nil {
-		if target.Kind() != reflect.Ptr {
-			return errors.New("Cannot set non-pointer value to null")
-		}
-		if !target.IsNil() {
-			target.Set(reflect.Zero(target.Type()))
-		}
-		return nil
-	}
-
-	if target.Kind() == reflect.Ptr && target.IsNil() {
-		target.Set(reflect.New(target.Type().Elem()))
-	}
-
+func callReceivers(target reflect.Value, value interface{}) (receiverFound bool, err error) {
 	preReceiver, hasPreReceive := target.Interface().(PreReceiver)
 	receiver, hasReceive := target.Interface().(Receiver)
 	postReceiver, hasPostReceive := target.Interface().(PostReceiver)
@@ -269,21 +258,49 @@ func setValue(target reflect.Value, value interface{}) (parseErr error) {
 			postReceiver, hasPostReceive = targetPtr.(PostReceiver)
 		}
 	}
+	receiverFound = hasReceive
 
 	if hasPreReceive {
-		if parseErr = preReceiver.PreReceive(); parseErr != nil {
+		if err = preReceiver.PreReceive(); err != nil {
 			return
 		}
 	}
 	if hasPostReceive {
 		defer func() {
-			if parseErr == nil {
-				parseErr = postReceiver.PostReceive()
+			if err == nil {
+				err = postReceiver.PostReceive()
 			}
 		}()
 	}
 	if hasReceive {
-		return receiver.Receive(value)
+		err = receiver.Receive(value)
+	}
+	return
+}
+
+// setValue takes a target and a value, and updates the target to
+// match the value.
+func setValue(target reflect.Value, value interface{}, fromRequest bool) (parseErr error) {
+	if value == nil {
+		if target.Kind() != reflect.Ptr {
+			return errors.New("Cannot set non-pointer value to null")
+		}
+		if !target.IsNil() {
+			target.Set(reflect.Zero(target.Type()))
+		}
+		return nil
+	}
+
+	if target.Kind() == reflect.Ptr && target.IsNil() {
+		target.Set(reflect.New(target.Type().Elem()))
+	}
+
+	// Only worry about the receive methods if the value is from a
+	// request.
+	if fromRequest {
+		if receiverFound, err := callReceivers(target, value); err != nil || receiverFound {
+			return err
+		}
 	}
 
 	for target.Kind() == reflect.Ptr {
