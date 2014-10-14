@@ -201,8 +201,10 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 				continue
 			}
 
-			value, fromParams := params[name]
+			valueInter, fromParams := params[name]
+			var value reflect.Value
 			if fromParams {
+				value = reflect.ValueOf(valueInter)
 				matchedFields = matchedFields.add(name)
 			} else {
 				// If we're not replacing the value, use the field's
@@ -210,33 +212,67 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 				// value.
 				zero := reflect.Zero(fieldValue.Type())
 				if replace {
-					if zero.IsNil() {
-						value = nil
-					} else {
-						value = zero.Interface()
-					}
+					value = zero
 				} else {
-					if fieldValue.IsNil() {
-						value = nil
-					} else {
-						value = fieldValue.Interface()
-					}
+					value = fieldValue
 				}
-				if value == nil || value == zero.Interface() {
+				if value == zero {
 					// The value is empty, so see if its default can
 					// be loaded.
-					if defaulter, ok := value.(Defaulter); ok {
-						value = defaulter.DefaultValue()
+					if defaulter, ok := fieldValue.Interface().(Defaulter); ok {
+						value = reflect.ValueOf(defaulter.DefaultValue())
 					}
 				}
 			}
-			var inputErr error
-			value, inputErr = ApplyOptions(field, fieldValue.Interface(), value)
+			var optionValue interface{}
+			if value.IsValid() {
+				optionValue = value.Interface()
+			}
+			newVal, inputErr := ApplyOptions(field, fieldValue.Interface(), optionValue)
 			if parseErrs.Set(name, inputErr) {
 				continue
 			}
+			value = reflect.ValueOf(newVal)
 			parseErrs.Set(name, setValue(fieldValue, value, fromParams))
 		}
+	}
+	return
+}
+
+// isNil returns true if value.IsValid() returns false or if
+// value.IsNil() returns true.  Returns false otherwise.  Recovers
+// panics from value.IsNil().
+func isNil(value reflect.Value) bool {
+	defer func() {
+		recover()
+	}()
+	if !value.IsValid() {
+		return true
+	}
+	if value.IsNil() {
+		return true
+	}
+	return false
+}
+
+func checkNil(target, value reflect.Value) (valueIsNil bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("Nil value found, but type %s cannot be nil.", target.Type().Name())
+		}
+	}()
+
+	if valueIsNil = isNil(value); valueIsNil {
+		// target.IsNil() will panic if target's zero value is
+		// non-nil.
+		if !target.IsNil() {
+			target.Set(reflect.Zero(target.Type()))
+		}
+		return
+	}
+
+	if isNil(target) {
+		target.Set(reflect.New(target.Type().Elem()))
 	}
 	return
 }
@@ -280,25 +316,15 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 
 // setValue takes a target and a value, and updates the target to
 // match the value.
-func setValue(target reflect.Value, value interface{}, fromRequest bool) (parseErr error) {
-	if value == nil {
-		if target.Kind() != reflect.Ptr {
-			return errors.New("Cannot set non-pointer value to null")
-		}
-		if !target.IsNil() {
-			target.Set(reflect.Zero(target.Type()))
-		}
-		return nil
-	}
-
-	if target.Kind() == reflect.Ptr && target.IsNil() {
-		target.Set(reflect.New(target.Type().Elem()))
+func setValue(target, value reflect.Value, fromRequest bool) (parseErr error) {
+	if isNil, err := checkNil(target, value); isNil || err != nil {
+		return err
 	}
 
 	// Only worry about the receive methods if the value is from a
 	// request.
 	if fromRequest {
-		if receiverFound, err := callReceivers(target, value); err != nil || receiverFound {
+		if receiverFound, err := callReceivers(target, value.Interface()); err != nil || receiverFound {
 			return err
 		}
 	}
@@ -308,16 +334,16 @@ func setValue(target reflect.Value, value interface{}, fromRequest bool) (parseE
 	}
 	switch target.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		parseErr = setInt(target, value)
+		parseErr = setInt(target, value.Interface())
 	case reflect.Float32, reflect.Float64:
-		parseErr = setFloat(target, value)
+		parseErr = setFloat(target, value.Interface())
 	default:
-		inputType := reflect.TypeOf(value)
+		inputType := value.Type()
 		if !inputType.ConvertibleTo(target.Type()) {
 			return fmt.Errorf("Cannot convert value of type %s to type %s",
 				inputType.Name(), target.Type().Name())
 		}
-		target.Set(reflect.ValueOf(value).Convert(target.Type()))
+		target.Set(value.Convert(target.Type()))
 	}
 	return
 }
