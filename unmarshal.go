@@ -255,7 +255,12 @@ func isNil(value reflect.Value) bool {
 	return false
 }
 
-func checkNil(target, value reflect.Value) (valueIsNil bool, err error) {
+// assignNil takes a target and value and handles nil assignment.  If
+// value is nil or invalid, target will be assigned nil.  If value is
+// non-nil and target is a nil pointer, it will be initialized.
+// Returns whether or not value evaluates to nil, and any errors
+// encountered while attempting assignment.
+func assignNil(target, value reflect.Value) (valueIsNil bool, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Nil value found, but type %s cannot be nil.", target.Type().Name())
@@ -271,7 +276,7 @@ func checkNil(target, value reflect.Value) (valueIsNil bool, err error) {
 		return
 	}
 
-	if isNil(target) {
+	if target.Kind() == reflect.Ptr && target.IsNil() {
 		target.Set(reflect.New(target.Type().Elem()))
 	}
 	return
@@ -317,7 +322,7 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 // setValue takes a target and a value, and updates the target to
 // match the value.
 func setValue(target, value reflect.Value, fromRequest bool) (parseErr error) {
-	if isNil, err := checkNil(target, value); isNil || err != nil {
+	if isNil, err := assignNil(target, value); isNil || err != nil {
 		return err
 	}
 
