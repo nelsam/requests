@@ -334,6 +334,10 @@ func setValue(target, value reflect.Value, fromRequest bool) (parseErr error) {
 		}
 	}
 
+	if target.Interface() == value.Interface() {
+		return nil
+	}
+
 	for target.Kind() == reflect.Ptr {
 		target = target.Elem()
 	}
