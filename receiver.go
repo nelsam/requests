@@ -1,5 +1,22 @@
 package requests
 
+// A ReceiveTyper has methods for returning the type that its
+// Receive method expects.  It *must* implement Receiver as well,
+// otherwise its ReceiveType method will be useless.  If it does,
+// then request data destined for the ReceiveTyper will be converted
+// (if possible) to the same type as the return value of its
+// ReceiveType method.
+type ReceiveTyper interface {
+	Receiver
+
+	// ReceiveType should return a value (preferably empty) of the same
+	// type as the ReceiveTyper's Receive method expects.  Any value
+	// in a request destined to be an argument for the ReceiveTyper's
+	// Receive method will first be converted to the same type as the
+	// value returned by ReceiveType.
+	ReceiveType() interface{}
+}
+
 // A Receiver is a type that receives a value from a request and
 // performs its own logic to apply the input value to itself.
 //

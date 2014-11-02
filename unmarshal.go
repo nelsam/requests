@@ -283,12 +283,16 @@ func assignNil(target, value reflect.Value) (valueIsNil bool, err error) {
 }
 
 func callReceivers(target reflect.Value, value interface{}) (receiverFound bool, err error) {
+	receiveTyper, hasReceiveType := target.Interface().(ReceiveTyper)
 	preReceiver, hasPreReceive := target.Interface().(PreReceiver)
 	receiver, hasReceive := target.Interface().(Receiver)
 	postReceiver, hasPostReceive := target.Interface().(PostReceiver)
 	if target.CanAddr() {
 		// If interfaces weren't found, try again with the pointer
 		targetPtr := target.Addr().Interface()
+		if !hasReceiveType {
+			receiveTyper, hasReceiveType = targetPtr.(ReceiveTyper)
+		}
 		if !hasPreReceive {
 			preReceiver, hasPreReceive = targetPtr.(PreReceiver)
 		}
@@ -314,6 +318,26 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 		}()
 	}
 	if hasReceive {
+		if hasReceiveType {
+			valueVal := reflect.ValueOf(value)
+			// Make sure the target value is assignable
+			targetVal := reflect.New(reflect.TypeOf(receiveTyper.ReceiveType())).Elem()
+			assignVal := targetVal
+			if !valueVal.Type().ConvertibleTo(targetVal.Type()) && targetVal.Kind() == reflect.Ptr {
+				// If the source value isn't convertible to the target type,
+				// but the target type is a pointer, try assigning to the
+				// target's elem.
+				if assignVal.IsNil() {
+					assignVal.Set(reflect.New(assignVal.Type().Elem()))
+				}
+				assignVal = assignVal.Elem()
+			}
+			if !valueVal.Type().ConvertibleTo(assignVal.Type()) {
+				return true, fmt.Errorf("Cannot convert kind %s to target kind %s", valueVal.Kind(), assignVal.Kind())
+			}
+			assignVal.Set(valueVal.Convert(assignVal.Type()))
+			value = targetVal.Interface()
+		}
 		err = receiver.Receive(value)
 	}
 	return
