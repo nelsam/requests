@@ -8,7 +8,7 @@ import (
 )
 
 type Fallback struct {
-	First  string `db:"first_field"`
+	First  string `db:"first_field" request:",foo,bar=baz,bacon"`
 	Second string `response:"second_field"`
 	Third  string `db:"-" response:"third_field,responseoption"`
 	Fourth string `db:"fourth_field,dboption" response:"-"`
