@@ -170,25 +170,30 @@ func ApplyOptions(field reflect.StructField, orig, input interface{}) (value int
 }
 
 func tagOptions(field reflect.StructField) []*tagOption {
-	tag := field.Tag.Get("request")
+	remaining := field.Tag.Get("request")
 	options := make([]*tagOption, 0, len(optionDefaults)+5)
-	for startIdx := strings.IndexRune(tag, ','); startIdx >= 0; startIdx = strings.IndexRune(tag[startIdx:], ',') {
+	for startIdx := strings.IndexRune(remaining, ','); startIdx >= 0; startIdx = strings.IndexRune(remaining, ',') {
 		// Skip over the ',' character
 		startIdx++
-		endIdx := strings.IndexRune(tag[startIdx:], ',')
+		endIdx := strings.IndexRune(remaining[startIdx:], ',')
 		if endIdx < 0 {
-			endIdx = len(tag)
+			endIdx = len(remaining)
+		} else {
+			endIdx += startIdx
 		}
-		optionNameEnd := strings.IndexRune(tag[startIdx:endIdx], '=')
+		currentOption := remaining[startIdx:endIdx]
+		remaining = remaining[endIdx:]
+
+		optionNameEnd := strings.IndexRune(currentOption, '=')
 		optionNameStart := optionNameEnd + 1
 		if optionNameEnd < 0 {
-			optionNameEnd = endIdx
-			optionNameStart = endIdx
+			optionNameEnd = len(currentOption)
+			optionNameStart = len(currentOption)
 		}
 
 		option := new(tagOption)
-		option.name = tag[startIdx:optionNameEnd]
-		option.value = tag[optionNameStart:endIdx]
+		option.name = currentOption[:optionNameEnd]
+		option.value = currentOption[optionNameStart:]
 		if option.value == "" {
 			option.value = "true"
 		}
