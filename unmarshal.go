@@ -286,6 +286,13 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 	receiveTyper, hasReceiveType := target.Interface().(ReceiveTyper)
 	preReceiver, hasPreReceive := target.Interface().(PreReceiver)
 	receiver, hasReceive := target.Interface().(Receiver)
+	var (
+		changeReceiver   ChangeReceiver
+		hasChangeReceive bool
+	)
+	if !hasReceive {
+		changeReceiver, hasChangeReceive = target.Interface().(ChangeReceiver)
+	}
 	postReceiver, hasPostReceive := target.Interface().(PostReceiver)
 	if target.CanAddr() {
 		// If interfaces weren't found, try again with the pointer
@@ -299,11 +306,14 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 		if !hasReceive {
 			receiver, hasReceive = targetPtr.(Receiver)
 		}
+		if !hasReceive && !hasChangeReceive {
+			changeReceiver, hasChangeReceive = targetPtr.(ChangeReceiver)
+		}
 		if !hasPostReceive {
 			postReceiver, hasPostReceive = targetPtr.(PostReceiver)
 		}
 	}
-	receiverFound = hasReceive
+	receiverFound = hasReceive || hasChangeReceive
 
 	if hasPreReceive {
 		if err = preReceiver.PreReceive(); err != nil {
@@ -317,7 +327,7 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 			}
 		}()
 	}
-	if hasReceive {
+	if hasReceive || hasChangeReceive {
 		if hasReceiveType {
 			valueVal := reflect.ValueOf(value)
 			// Make sure the target value is assignable
@@ -338,7 +348,11 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 			assignVal.Set(valueVal.Convert(assignVal.Type()))
 			value = targetVal.Interface()
 		}
-		err = receiver.Receive(value)
+		if hasReceive {
+			err = receiver.Receive(value)
+		} else {
+			_, err = changeReceiver.Receive(value)
+		}
 	}
 	return
 }

@@ -34,13 +34,39 @@ func Default(orig, value interface{}, optionValue string) (interface{}, error) {
 	return value, nil
 }
 
+// changeReceiver is just a clone of requests.ChangeReceiver, since we can't
+// import requests in this package.
+type changeReceiver interface {
+	Receive(interface{}) (bool, error)
+}
+
+// receiver is a clone of requests.Receiver, similar to changeReceiver.
+type receiver interface {
+	Receive(interface{}) error
+}
+
 // Immutable is an option func that ensures that a value is not
 // modified after being set.  It will return an error if orig is
 // non-empty and does not match the new value from the request.
 func Immutable(orig, value interface{}, optionValue string) (interface{}, error) {
+	immutableErr := errors.New("Value is immutable once set")
 	if optionValue == "true" {
+		if _, ok := orig.(receiver); ok {
+			return nil, errors.New("Receiver types cannot be immutable.  " +
+				"See ChangeReceiver for a supported alternative.")
+		}
 		if orig != reflect.Zero(reflect.TypeOf(orig)).Interface() && orig != value {
-			return nil, errors.New("Value is immutable once set")
+			if changeReceiver, ok := orig.(changeReceiver); ok {
+				changed, err := changeReceiver.Receive(value)
+				if err != nil {
+					return nil, err
+				}
+				if changed {
+					return nil, immutableErr
+				}
+				return value, nil
+			}
+			return nil, immutableErr
 		}
 	}
 	return value, nil

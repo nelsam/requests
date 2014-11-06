@@ -34,6 +34,26 @@ type Receiver interface {
 	Receive(interface{}) error
 }
 
+// A ChangeReceiver is a receiver that, in addition to performing its
+// own logic for receiving input values, also returns whether or not the
+// passed in value was different from the existing value.
+//
+// This is used primarily for immutable option checking.  Struct fields
+// of type Receiver cannot support the "immutable" option, so types
+// which are used in struct fields that need the "immutable" option should
+// implement ChangeReceiver, instead.
+//
+// Note that this will *not* be used if the current value of the field is
+// equal to the empty value of the field - only if the field is set to
+// a non-empty value will the immutable option care about the ChangeReceiver
+// interface.
+type ChangeReceiver interface {
+	// Receive takes a value and performs the same logic as
+	// Receiver.Receive, but returns whether or not the new value is
+	// different from the old value, as well as any errors encountered.
+	Receive(interface{}) (valueChanged bool, err error)
+}
+
 // A PreReceiver has an action to perform prior to receiving data from
 // a user request.
 type PreReceiver interface {
