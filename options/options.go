@@ -54,11 +54,11 @@ func isPtrOrInter(t reflect.Type) bool {
 // will return true, as will zeroOrEqual(new(int64), float32(0)).
 func zeroOrEqual(orig, value interface{}) bool {
 	origType := reflect.TypeOf(orig)
-	origVal := reflect.New(origType).Elem()
-	origVal.Set(reflect.ValueOf(orig))
-	if orig == reflect.Zero(origType) {
+	if orig == reflect.Zero(origType).Interface() {
 		return true
 	}
+	origVal := reflect.New(origType).Elem()
+	origVal.Set(reflect.ValueOf(orig))
 	compareValue := reflect.ValueOf(value)
 	for !compareValue.Type().ConvertibleTo(origType) && isPtrOrInter(origType) {
 		if origVal.IsNil() {
