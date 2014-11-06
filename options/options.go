@@ -55,7 +55,12 @@ func Immutable(orig, value interface{}, optionValue string) (interface{}, error)
 			return nil, errors.New("Receiver types cannot be immutable.  " +
 				"See ChangeReceiver for a supported alternative.")
 		}
-		if orig != reflect.Zero(reflect.TypeOf(orig)).Interface() && orig != value {
+		origType := reflect.TypeOf(orig)
+		compareValue := reflect.ValueOf(value)
+		if compareValue.Type().ConvertibleTo(origType) {
+			compareValue = compareValue.Convert(origType)
+		}
+		if orig != reflect.Zero(origType).Interface() && orig != compareValue.Interface() {
 			if changeReceiver, ok := orig.(changeReceiver); ok {
 				changed, err := changeReceiver.Receive(value)
 				if err != nil {
