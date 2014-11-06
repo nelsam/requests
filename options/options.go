@@ -45,6 +45,37 @@ type receiver interface {
 	Receive(interface{}) error
 }
 
+func isPtrOrInter(t reflect.Type) bool {
+	return t.Kind() == reflect.Ptr || t.Kind() == reflect.Interface
+}
+
+// zeroOrEqual checks whether orig is either the zero value of its type or
+// loosely equal to value.  The main utility here is that zeroOrEqual(4.0, 4)
+// will return true, as will zeroOrEqual(new(int64), float32(0)).
+func zeroOrEqual(orig, value interface{}) bool {
+	origVal := reflect.ValueOf(orig)
+	origType := origVal.Type()
+	if orig == reflect.Zero(origType) {
+		return true
+	}
+	compareValue := reflect.ValueOf(value)
+	for !compareValue.Type().ConvertibleTo(origType) && isPtrOrInter(origType) {
+		if origVal.IsNil() {
+			if origVal.Kind() != reflect.Ptr {
+				// Can't initialize
+				return false
+			}
+			origVal.Set(reflect.New(origType.Elem()))
+		}
+		origVal = origVal.Elem()
+		origType = origType.Elem()
+	}
+	if compareValue.Type().ConvertibleTo(origType) {
+		compareValue = compareValue.Convert(origType)
+	}
+	return origVal.Interface() == compareValue.Interface()
+}
+
 // Immutable is an option func that ensures that a value is not
 // modified after being set.  It will return an error if orig is
 // non-empty and does not match the new value from the request.
@@ -55,12 +86,7 @@ func Immutable(orig, value interface{}, optionValue string) (interface{}, error)
 			return nil, errors.New("Receiver types cannot be immutable.  " +
 				"See ChangeReceiver for a supported alternative.")
 		}
-		origType := reflect.TypeOf(orig)
-		compareValue := reflect.ValueOf(value)
-		if compareValue.Type().ConvertibleTo(origType) {
-			compareValue = compareValue.Convert(origType)
-		}
-		if orig != reflect.Zero(origType).Interface() && orig != compareValue.Interface() {
+		if !zeroOrEqual(orig, value) {
 			if changeReceiver, ok := orig.(changeReceiver); ok {
 				changed, err := changeReceiver.Receive(value)
 				if err != nil {
