@@ -26,6 +26,7 @@ type Request struct {
 	httpRequest *http.Request
 	body        interface{}
 	params      map[string]interface{}
+	queryParams map[string]interface{}
 }
 
 // New creates a new *Request based on the request parameter.

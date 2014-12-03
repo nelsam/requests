@@ -36,6 +36,19 @@ func (request *Request) Body() (interface{}, error) {
 	return request.body, nil
 }
 
+// QueryParams performs the same conversion for query parameters
+// in the request's URL as Params does for body parameters (i.e.
+// converting []string entries with a len() of 1 to string values).
+// The intent is to allow you to treat parameters in GET requests
+// the same way you treat parameters in POST or PATCH requests.
+func (request *Request) QueryParams() map[string]interface{} {
+	if request.queryParams == nil {
+		queryBody := request.httpRequest.URL.Query()
+		request.queryParams, _ = convertToParams(queryBody)
+	}
+	return request.queryParams
+}
+
 // Params returns the result of ParseParams for this request.
 // ParseParams will only be called the first time Params is called;
 // subsequent calls will return the same value as the first call.
