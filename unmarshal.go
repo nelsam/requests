@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+
+	"github.com/stretchr/codecs/services"
 )
 
 // set is a simple slice of unique strings.
@@ -81,6 +83,12 @@ func (request *Request) UnmarshalReplace(target interface{}) error {
 // UnusedFields error will be returned if fields in the request had no
 // corresponding fields on the target struct.
 //
+// Panics from an Unmarshaller's Unmarshal method will be recovered and
+// returned as error types.  The error will be the same error as
+// returned by request.Params() if the error returned from
+// request.Params() is of type *services.ContentTypeNotSupportedError,
+// or a generic error with the recover output otherwise.
+//
 // Any errors encountered while attempting to apply input values to
 // the target's fields will be stored in an error of type InputErrors.
 // At the end of the Unmarshal process, the InputErrors error will be
@@ -121,10 +129,6 @@ func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalEr
 		return errors.New("The value passed to Unmarshal must be a pointer to a struct")
 	}
 	targetValue = targetValue.Elem()
-	params, err := request.Params()
-	if err != nil {
-		return err
-	}
 
 	if preUnmarshaller, ok := target.(PreUnmarshaller); ok {
 		if unmarshalErr = preUnmarshaller.PreUnmarshal(); unmarshalErr != nil {
@@ -138,8 +142,32 @@ func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalEr
 			}
 		}()
 	}
+	// We allow Unmarshallers to handle types that aren't supported by this
+	// library, so wait to return an error from Params() until after we've
+	// checked if target is an Unmarshaler.
+	params, err := request.Params()
 	if unmarshaller, ok := target.(Unmarshaller); ok {
-		return unmarshaller.Unmarshal(params)
+		var body interface{} = params
+		if err != nil {
+			// Only ignore ContentTypeNotSupportedError
+			if _, ok := err.(*services.ContentTypeNotSupportedError); !ok {
+				return err
+			}
+			body = request.httpRequest.Body
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				if err != nil {
+					unmarshalErr = err
+				} else {
+					unmarshalErr = fmt.Errorf("Unmarshal panicked: %v", r)
+				}
+			}
+		}()
+		return unmarshaller.Unmarshal(body)
+	}
+	if unmarshalErr != nil {
+		return
 	}
 
 	matchedFields, inputErrs := unmarshalToValue(params, targetValue, replace)

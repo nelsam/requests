@@ -17,7 +17,7 @@ func TestInputErrors(t *testing.T) {
 
 	errs.Set("test", nil)
 	assert.False(errs.HasErrors())
-	assert.NotEqual(errs, errs.Errors())
+	assert.NotEqual(len(errs), len(errs.Errors()))
 	assert.Equal(emptyMessage, errs.Error())
 
 	errs = make(InputErrors)
