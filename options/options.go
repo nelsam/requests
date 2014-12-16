@@ -7,33 +7,6 @@ import (
 	"reflect"
 )
 
-// Required is an option func that ensures a non-nil value was passed
-// along in the request.  It does not ensure that the value is
-// non-empty.
-func Required(orig, value interface{}, optionValue string) (interface{}, error) {
-	if optionValue == "true" {
-		if value == nil {
-			return nil, errors.New("Required value has nil input")
-		}
-	}
-	return value, nil
-}
-
-// Default is an option func that sets a default value for a field.
-// If the value doesn't exist in the request (or is nil), the provided
-// default will be used instead.
-func Default(orig, value interface{}, optionValue string) (interface{}, error) {
-	if value == nil {
-		if optionValue != "" {
-			// This is a string type, but we'll leave it up to the
-			// unmarshal process (or the Receiver's Receive method) to
-			// convert it.
-			return optionValue, nil
-		}
-	}
-	return value, nil
-}
-
 // changeReceiver is just a clone of requests.ChangeReceiver, since we can't
 // import requests in this package.
 type changeReceiver interface {
@@ -75,6 +48,33 @@ func zeroOrEqual(orig, value interface{}) bool {
 		compareValue = compareValue.Convert(origType)
 	}
 	return origVal.Interface() == compareValue.Interface()
+}
+
+// Required is an option func that ensures a non-nil value was passed
+// along in the request.  It does not ensure that the value is
+// non-empty.
+func Required(orig, value interface{}, optionValue string) (interface{}, error) {
+	if optionValue == "true" {
+		if value == nil {
+			return nil, errors.New("Required value has nil input")
+		}
+	}
+	return value, nil
+}
+
+// Default is an option func that sets a default value for a field.
+// If the value doesn't exist in the request (or is nil), the provided
+// default will be used instead.
+func Default(orig, value interface{}, optionValue string) (interface{}, error) {
+	if value == nil {
+		if optionValue != "" {
+			// This is a string type, but we'll leave it up to the
+			// unmarshal process (or the Receiver's Receive method) to
+			// convert it.
+			return optionValue, nil
+		}
+	}
+	return value, nil
 }
 
 // Immutable is an option func that ensures that a value is not

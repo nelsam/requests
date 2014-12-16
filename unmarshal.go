@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/stretchr/codecs/services"
 )
@@ -222,47 +223,58 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 			continue
 		}
 
-		// Skip unexported fields
-		if field.PkgPath == "" {
-			name := name(field)
-			if name == "-" {
-				continue
-			}
-
-			valueInter, fromParams := params[name]
-			var value reflect.Value
-			if fromParams {
-				value = reflect.ValueOf(valueInter)
-				matchedFields = matchedFields.add(name)
-			} else {
-				// If we're not replacing the value, use the field's
-				// current value.  If we are, use the field's zero
-				// value.
-				zero := reflect.Zero(fieldValue.Type())
-				if replace {
-					value = zero
-				} else {
-					value = fieldValue
-				}
-				if value == zero {
-					// The value is empty, so see if its default can
-					// be loaded.
-					if defaulter, ok := fieldValue.Interface().(Defaulter); ok {
-						value = reflect.ValueOf(defaulter.DefaultValue())
-					}
-				}
-			}
-			var optionValue interface{}
-			if value.IsValid() {
-				optionValue = value.Interface()
-			}
-			newVal, inputErr := ApplyOptions(field, fieldValue.Interface(), optionValue)
-			if parseErrs.Set(name, inputErr) {
-				continue
-			}
-			value = reflect.ValueOf(newVal)
-			parseErrs.Set(name, setValue(fieldValue, value, fromParams))
+		name := name(field)
+		if name == "-" {
+			continue
 		}
+		setter := fieldValue.Set
+		if field.PkgPath == "" {
+			// Unexported fields can only be supported if they have setters.
+			// We detect these methods following the rules in Effective Go.
+			setterName := "Set" + strings.Title(field.Name)
+			setterMethod := targetValue.MethodByName(setterName)
+			if !setterMethod.IsValid() {
+				parseErrs.Set(name, fmt.Errorf("Unexported field %s needs a setter method %s, "+
+					"or should be unused in the request (hint: field tag `request:\"-\"`).",
+					field.Name, setterName))
+			}
+			setter = func(val reflect.Value) {
+				setterMethod.Call([]reflect.Value{targetValue, val})
+			}
+		}
+		valueInter, fromParams := params[name]
+		var value reflect.Value
+		if fromParams {
+			value = reflect.ValueOf(valueInter)
+			matchedFields = matchedFields.add(name)
+		} else {
+			// If we're not replacing the value, use the field's
+			// current value.  If we are, use the field's zero
+			// value.
+			zero := reflect.Zero(fieldValue.Type())
+			if replace {
+				value = zero
+			} else {
+				value = fieldValue
+			}
+			if value == zero {
+				// The value is empty, so see if its default can
+				// be loaded.
+				if defaulter, ok := fieldValue.Interface().(Defaulter); ok {
+					value = reflect.ValueOf(defaulter.DefaultValue())
+				}
+			}
+		}
+		var optionValue interface{}
+		if value.IsValid() {
+			optionValue = value.Interface()
+		}
+		newVal, inputErr := ApplyOptions(field, fieldValue.Interface(), optionValue)
+		if parseErrs.Set(name, inputErr) {
+			continue
+		}
+		value = reflect.ValueOf(newVal)
+		parseErrs.Set(name, setValue(fieldValue, value, setter, fromParams))
 	}
 	return
 }
@@ -288,7 +300,7 @@ func isNil(value reflect.Value) bool {
 // non-nil and target is a nil pointer, it will be initialized.
 // Returns whether or not value evaluates to nil, and any errors
 // encountered while attempting assignment.
-func assignNil(target, value reflect.Value) (valueIsNil bool, err error) {
+func assignNil(target, value reflect.Value, targetSetter func(reflect.Value)) (valueIsNil bool, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Nil value found, but type %s cannot be nil.", target.Type().Name())
@@ -299,13 +311,9 @@ func assignNil(target, value reflect.Value) (valueIsNil bool, err error) {
 		// target.IsNil() will panic if target's zero value is
 		// non-nil.
 		if !target.IsNil() {
-			target.Set(reflect.Zero(target.Type()))
+			targetSetter(reflect.Zero(target.Type()))
 		}
 		return
-	}
-
-	if target.Kind() == reflect.Ptr && target.IsNil() {
-		target.Set(reflect.New(target.Type().Elem()))
 	}
 	return
 }
@@ -386,10 +394,16 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 }
 
 // setValue takes a target and a value, and updates the target to
-// match the value.
-func setValue(target, value reflect.Value, fromRequest bool) (parseErr error) {
-	if isNil, err := assignNil(target, value); isNil || err != nil {
+// match the value.  targetSetter should be target.Set for any settable
+// values, but can perform other logic for situations such as unexported
+// fields that have SetX methods on the parent struct.
+func setValue(target, value reflect.Value, targetSetter func(reflect.Value), fromRequest bool) (parseErr error) {
+	if isNil, err := assignNil(target, value, targetSetter); isNil || err != nil {
 		return err
+	}
+	if target.Kind() == reflect.Ptr && target.IsNil() {
+		target = reflect.New(target.Type().Elem())
+		targetSetter(target)
 	}
 
 	// Only worry about the receive methods if the value is from a
@@ -421,7 +435,7 @@ func setValue(target, value reflect.Value, fromRequest bool) (parseErr error) {
 			return fmt.Errorf("Cannot convert value of type %s to type %s",
 				inputType.Name(), target.Type().Name())
 		}
-		target.Set(value.Convert(target.Type()))
+		targetSetter(value.Convert(target.Type()))
 	}
 	return
 }

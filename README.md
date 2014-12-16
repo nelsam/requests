@@ -61,11 +61,12 @@ For projects with solid unit testing, or projects intending to follow
 continuous integration, I recommend getting directly from github:
 
 ```
-go get github.com/go-requests/requests
+go get github.com/nelsam/requests
 ```
 
 However, for projects that need more assurances that *nothing* will
-*ever* change, this project does support versioning through gopkg.in:
+*ever* change, this project does support versioning through gopkg.in
+(using a fork at github.com/go-requests/requests):
 
 ```
 go get gopkg.in/requests.v0
