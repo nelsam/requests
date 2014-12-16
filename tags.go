@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/go-requests/requests/options"
+	"github.com/nelsam/requests/options"
 )
 
 var (
