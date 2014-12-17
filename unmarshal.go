@@ -228,18 +228,25 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 			continue
 		}
 		setter := fieldValue.Set
-		if field.PkgPath == "" {
+		if field.PkgPath != "" {
 			// Unexported fields can only be supported if they have setters.
 			// We detect these methods following the rules in Effective Go.
+			receiver := targetValue
+			if receiver.CanAddr() {
+				// All methods can be called on pointer receivers, so use the
+				// pointer if possible.
+				receiver = receiver.Addr()
+			}
 			setterName := "Set" + strings.Title(field.Name)
-			setterMethod := targetValue.MethodByName(setterName)
-			if !setterMethod.IsValid() {
+			setterMethod, exists := receiver.Type().MethodByName(setterName)
+			if !exists || setterMethod.Type.NumIn() != 2 || setterMethod.Type.NumOut() != 0 {
 				parseErrs.Set(name, fmt.Errorf("Unexported field %s needs a setter method %s, "+
 					"or should be unused in the request (hint: field tag `request:\"-\"`).",
 					field.Name, setterName))
+				continue
 			}
 			setter = func(val reflect.Value) {
-				setterMethod.Call([]reflect.Value{targetValue, val})
+				setterMethod.Func.Call([]reflect.Value{receiver, val})
 			}
 		}
 		valueInter, fromParams := params[name]
