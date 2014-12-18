@@ -227,26 +227,45 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 		if name == "-" {
 			continue
 		}
+		// Store the type that values should be converted to for this field,
+		// so that setters can use the type of their argument.
+		fieldTargetType := field.Type
 		setter := fieldValue.Set
 		if field.PkgPath != "" {
-			// Unexported fields can only be supported if they have setters.
-			// We detect these methods following the rules in Effective Go.
+			// Support unexported fields using getters and setters of the format
+			// recommended in Effective Go.
 			receiver := targetValue
 			if receiver.CanAddr() {
 				// All methods can be called on pointer receivers, so use the
 				// pointer if possible.
 				receiver = receiver.Addr()
 			}
-			setterName := "Set" + strings.Title(field.Name)
-			setterMethod, exists := receiver.Type().MethodByName(setterName)
-			if !exists || setterMethod.Type.NumIn() != 2 || setterMethod.Type.NumOut() != 0 {
+			getterName := strings.Title(field.Name)
+			getterMethod, hasGetter := receiver.Type().MethodByName(getterName)
+			if !hasGetter || getterMethod.Type.NumIn() != 1 || getterMethod.Type.NumOut() != 1 {
+				parseErrs.Set(name, fmt.Errorf("Unexported field %s needs a getter method %s, "+
+					"or should be unused in the request (hint: field tag `request:\"-\"`)",
+					field.Name, getterName))
+			}
+			setterName := "Set" + getterName
+			setterMethod, hasSetter := receiver.Type().MethodByName(setterName)
+			if !hasSetter || setterMethod.Type.NumIn() != 2 || setterMethod.Type.NumOut() != 0 {
 				parseErrs.Set(name, fmt.Errorf("Unexported field %s needs a setter method %s, "+
 					"or should be unused in the request (hint: field tag `request:\"-\"`).",
 					field.Name, setterName))
+			}
+			if !(hasGetter && hasSetter) {
 				continue
 			}
 			setter = func(val reflect.Value) {
 				setterMethod.Func.Call([]reflect.Value{receiver, val})
+			}
+			fieldValue = getterMethod.Func.Call([]reflect.Value{receiver})[0]
+			fieldTargetType = setterMethod.Type.In(1)
+			if fieldTargetType.Kind() == reflect.Interface {
+				// The setter appears to take a number of different values,
+				// so use the return value of the getter as the target type.
+				fieldTargetType = fieldValue.Type()
 			}
 		}
 		valueInter, fromParams := params[name]
@@ -281,7 +300,7 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 			continue
 		}
 		value = reflect.ValueOf(newVal)
-		parseErrs.Set(name, setValue(fieldValue, value, setter, fromParams))
+		parseErrs.Set(name, setValue(fieldValue, value, fieldTargetType, setter, fromParams))
 	}
 	return
 }
@@ -404,7 +423,7 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 // match the value.  targetSetter should be target.Set for any settable
 // values, but can perform other logic for situations such as unexported
 // fields that have SetX methods on the parent struct.
-func setValue(target, value reflect.Value, targetSetter func(reflect.Value), fromRequest bool) (parseErr error) {
+func setValue(target, value reflect.Value, targetType reflect.Type, targetSetter func(reflect.Value), fromRequest bool) (parseErr error) {
 	if isNil, err := assignNil(target, value, targetSetter); isNil || err != nil {
 		return err
 	}
@@ -425,76 +444,42 @@ func setValue(target, value reflect.Value, targetSetter func(reflect.Value), fro
 		return nil
 	}
 
-	for target.Kind() == reflect.Ptr {
-		target = target.Elem()
+	useAddr := false
+	if targetType.Kind() == reflect.Ptr {
+		useAddr = true
+		targetType = targetType.Elem()
 	}
-	switch target.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		parseErr = setInt(target, value.Interface())
-	case reflect.Float32, reflect.Float64:
-		parseErr = setFloat(target, value.Interface())
-	default:
-		for value.Kind() == reflect.Ptr {
-			value = value.Elem()
-		}
-		inputType := value.Type()
-		if !inputType.ConvertibleTo(target.Type()) {
-			return fmt.Errorf("Cannot convert value of type %s to type %s",
-				inputType.Name(), target.Type().Name())
-		}
-		targetSetter(value.Convert(target.Type()))
+	if value.Kind() == reflect.Ptr {
+		value = value.Elem()
 	}
+	if value.Kind() == reflect.String {
+		// Handle some basic strconv conversions.
+		switch targetType.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			intVal, err := strconv.ParseInt(value.Interface().(string), 10, 64)
+			if err != nil {
+				return err
+			}
+			value = reflect.ValueOf(intVal)
+		case reflect.Float32, reflect.Float64:
+			floatVal, err := strconv.ParseFloat(value.Interface().(string), 64)
+			if err != nil {
+				return err
+			}
+			value = reflect.ValueOf(floatVal)
+		}
+	}
+	inputType := value.Type()
+	if !inputType.ConvertibleTo(targetType) {
+		return fmt.Errorf("Cannot convert value of type %s to type %s",
+			inputType.Name(), targetType.Name())
+	}
+	value = value.Convert(targetType)
+	if useAddr {
+		ptr := reflect.New(targetType)
+		ptr.Elem().Set(value)
+		value = ptr
+	}
+	targetSetter(value)
 	return
-}
-
-func setInt(target reflect.Value, value interface{}) error {
-	switch src := value.(type) {
-	case string:
-		intVal, err := strconv.ParseInt(src, 10, 64)
-		if err != nil {
-			return err
-		}
-		target.SetInt(intVal)
-	case int:
-		target.SetInt(int64(src))
-	case int8:
-		target.SetInt(int64(src))
-	case int16:
-		target.SetInt(int64(src))
-	case int32:
-		target.SetInt(int64(src))
-	case int64:
-		target.SetInt(src)
-	case float32:
-		target.SetInt(int64(src))
-	case float64:
-		target.SetInt(int64(src))
-	}
-	return nil
-}
-
-func setFloat(target reflect.Value, value interface{}) error {
-	switch src := value.(type) {
-	case string:
-		floatVal, err := strconv.ParseFloat(src, 64)
-		if err != nil {
-			return err
-		}
-		target.SetFloat(floatVal)
-	case int:
-		target.SetFloat(float64(src))
-	case int8:
-		target.SetFloat(float64(src))
-	case int16:
-		target.SetFloat(float64(src))
-	case int32:
-		target.SetFloat(float64(src))
-	case int64:
-		target.SetFloat(float64(src))
-	case float32:
-		target.SetFloat(float64(src))
-	case float64:
-		target.SetFloat(src)
-	}
-	return nil
 }
