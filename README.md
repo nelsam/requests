@@ -1,5 +1,5 @@
-[![Build Status](https://drone.io/github.com/go-requests/requests/status.png)](https://drone.io/github.com/go-requests/requests/latest)
-[![Coverage Status](https://img.shields.io/coveralls/go-requests/requests.svg)](https://coveralls.io/r/go-requests/requests?branch=master)
+[![Build Status](https://drone.io/github.com/nelsam/requests/status.png)](https://drone.io/github.com/nelsam/requests/latest)
+[![Coverage Status](https://img.shields.io/coveralls/nelsam/requests.svg)](https://coveralls.io/r/nelsam/requests?branch=master)
 
 requests
 ========
