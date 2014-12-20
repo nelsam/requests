@@ -43,3 +43,52 @@ func TestBody_JSON(t *testing.T) {
 		assert.Equal("bar", foo)
 	}
 }
+
+func TestParams_UrlEncoded(t *testing.T) {
+	assert := assert.New(t)
+	body := bytes.NewBufferString(`test=1&test=2&foo=bar`)
+	httpRequest, err := http.NewRequest("POST", "/", body)
+	httpRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	require.NoError(t, err)
+	bodyParams, err := New(httpRequest).Params()
+	require.NoError(t, err)
+
+	expected := map[string]interface{}{
+		"foo":  "bar",
+		"test": []interface{}{"1", "2"}}
+	assert.Equal(expected, bodyParams)
+}
+
+func TestParams_JSON(t *testing.T) {
+	assert := assert.New(t)
+	body := bytes.NewBufferString(`{"test":["1", "2"],"foo":"bar"}`)
+	httpRequest, err := http.NewRequest("POST", "/", body)
+	httpRequest.Header.Set("Content-Type", "application/json")
+	require.NoError(t, err)
+	bodyParams, err := New(httpRequest).Params()
+	require.NoError(t, err)
+
+	expected := map[string]interface{}{
+		"foo":  "bar",
+		"test": []interface{}{"1", "2"}}
+	assert.Equal(expected, bodyParams)
+}
+
+func TestParams_BothForms(t *testing.T) {
+	assert := assert.New(t)
+	body := bytes.NewBufferString(`test=1&test=2&foo=bar`)
+	httpRequest, err := http.NewRequest("POST", "/", body)
+	httpRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	require.NoError(t, err)
+	UrlEncodedParams, err := New(httpRequest).Params()
+	require.NoError(t, err)
+
+	body = bytes.NewBufferString(`{"test":["1", "2"],"foo":"bar"}`)
+	httpRequest, err = http.NewRequest("POST", "/", body)
+	httpRequest.Header.Set("Content-Type", "application/json")
+	require.NoError(t, err)
+	JSONParams, err := New(httpRequest).Params()
+	require.NoError(t, err)
+
+	assert.Equal(UrlEncodedParams, JSONParams)
+}
