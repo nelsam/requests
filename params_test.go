@@ -44,6 +44,18 @@ func TestBody_JSON(t *testing.T) {
 	}
 }
 
+func TestQueryParams(t *testing.T) {
+	assert := assert.New(t)
+	httpRequest, err := http.NewRequest("GET", "/?test=1&test=2&foo=bar", nil)
+	require.NoError(t, err)
+	queryParams := New(httpRequest).QueryParams()
+
+	expected := map[string]interface{}{
+		"foo":  "bar",
+		"test": []interface{}{"1", "2"}}
+	assert.Equal(expected, queryParams)
+}
+
 func TestParams_UrlEncoded(t *testing.T) {
 	assert := assert.New(t)
 	body := bytes.NewBufferString(`test=1&test=2&foo=bar`)
