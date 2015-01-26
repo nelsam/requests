@@ -2,8 +2,8 @@ package requests
 
 import (
 	"bytes"
-	"testing"
 	"net/http"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,16 +30,16 @@ type structType struct{}
 
 type testTarget struct {
 	structType
-	Foo int64
-	Bar float64
-	Baz string
-	Qux *emote
-	Quxtyper *emoteTyper
-	Interfacemember interface{}
-	Defaultermember interface{} `request:"interfacemember,default"`
-	Ignoredmember interface{} `request:"-"`
-	structmember struct{m int64}
-	unexported int64
+	Foo                 int64
+	Bar                 float64
+	Baz                 string
+	Qux                 *emote
+	Quxtyper            *emoteTyper
+	Interfacemember     interface{}
+	Defaultermember     interface{} `request:"interfacemember,default"`
+	Ignoredmember       interface{} `request:"-"`
+	structmember        struct{ m int64 }
+	unexported          int64
 	unexportedinterface interface{}
 }
 
@@ -57,10 +57,10 @@ func (tt *testTarget) Unexportedinterface() interface{} {
 	return tt.unexportedinterface
 }
 
-func (tt *testTarget) SetStructmember(s struct{m int64}) {
+func (tt *testTarget) SetStructmember(s struct{ m int64 }) {
 	tt.structmember = s
 }
-func (tt *testTarget) Structmember() struct{m int64} {
+func (tt *testTarget) Structmember() struct{ m int64 } {
 	return tt.structmember
 }
 
@@ -80,7 +80,7 @@ func (tt *testErrTarget) SetNoget(s struct{}) {
 	tt.noget = s
 }
 
-type testUnmarshaller struct {}
+type testUnmarshaller struct{}
 
 func (tu *testUnmarshaller) Unmarshal(b interface{}) error {
 	return nil
@@ -93,7 +93,7 @@ func TestUnmarshal_All(t *testing.T) {
 	httpRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	require.NoError(t, err)
 
-   target := new(testTarget)
+	target := new(testTarget)
 	target.Qux = new(emote)
 	target.Qux.Receive("default")
 
@@ -111,7 +111,7 @@ func TestUnmarshal_AnonPtr(t *testing.T) {
 	httpRequest, err := http.NewRequest("POST", "/", nil)
 	require.NoError(t, err)
 
-   target := new(testTargetPtr)
+	target := new(testTargetPtr)
 
 	err = New(httpRequest).Unmarshal(target)
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestUnmarshalReplace_All(t *testing.T) {
 	httpRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	require.NoError(t, err)
 
-   target := new(testTarget)
+	target := new(testTarget)
 	target.Foo = 1
 	target.Bar = 2.7
 	target.Baz = "default"
