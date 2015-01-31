@@ -36,6 +36,13 @@ func (request *Request) Body() (interface{}, error) {
 	return request.body, nil
 }
 
+// SetBody allows you to assign a body (for example, unmarshalled json)
+// to the request.  You can use this for making use of request's
+// Unmarshal method when you don't have an *http.Request instance.
+func (request *Request) SetBody(body interface{}) {
+	request.body = body
+}
+
 // QueryParams performs the same conversion for query parameters
 // in the request's URL as Params does for body parameters (i.e.
 // converting []string entries with a len() of 1 to string values).
