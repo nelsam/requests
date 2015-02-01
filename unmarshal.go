@@ -300,7 +300,7 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 			continue
 		}
 		value = reflect.ValueOf(newVal)
-		parseErrs.Set(name, setValue(fieldValue, value, fieldTargetType, setter, fromParams))
+		parseErrs.Set(name, setValue(fieldValue, value, fieldTargetType, setter, fromParams, replace))
 	}
 	return
 }
@@ -423,7 +423,7 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 // match the value.  targetSetter should be target.Set for any settable
 // values, but can perform other logic for situations such as unexported
 // fields that have SetX methods on the parent struct.
-func setValue(target, value reflect.Value, targetType reflect.Type, targetSetter func(reflect.Value), fromRequest bool) (parseErr error) {
+func setValue(target, value reflect.Value, targetType reflect.Type, targetSetter func(reflect.Value), fromRequest, replace bool) (parseErr error) {
 	if isNil, err := assignNil(target, value, targetSetter); isNil || err != nil {
 		return err
 	}
@@ -468,6 +468,13 @@ func setValue(target, value reflect.Value, targetType reflect.Type, targetSetter
 			}
 			value = reflect.ValueOf(floatVal)
 		}
+	}
+	if value.Kind() == reflect.Map && targetType.Kind() == reflect.Struct {
+		if target.Kind() == reflect.Ptr {
+			target = target.Elem()
+		}
+		unmarshalToValue(value.Interface().(map[string]interface{}), target, replace)
+		return
 	}
 	inputType := value.Type()
 	if !inputType.ConvertibleTo(targetType) {
