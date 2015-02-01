@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/codecs/services"
 )
 
+var WrongTypeError = errors.New("The value passed to Unmarshal must be either a pointer to a struct or a pointer to a slice of structs (or struct pointers)")
+
 // set is a simple slice of unique strings.
 type set []string
 
@@ -122,13 +124,60 @@ func (request *Request) Unmarshal(target interface{}) error {
 	return request.unmarshal(target, false)
 }
 
+func (request *Request) unmarshal(target interface{}, replace bool) error {
+	targetValue := reflect.ValueOf(target)
+	if targetValue.Kind() == reflect.Ptr {
+		switch targetValue.Elem().Kind() {
+		case reflect.Struct:
+			return request.unmarshalMapBody(targetValue, request.Params, replace)
+		case reflect.Slice:
+			return request.unmarshalSliceBody(targetValue, replace)
+		}
+	}
+	return WrongTypeError
+}
+
+func (request *Request) unmarshalSliceBody(targetValue reflect.Value, replace bool) error {
+	sliceValue := targetValue.Elem()
+	sliceElemType := sliceValue.Type().Elem()
+	sliceElemIsStructPtr := sliceElemType.Kind() == reflect.Ptr && sliceElemType.Elem().Kind() == reflect.Struct
+	if !sliceElemIsStructPtr && sliceElemType.Kind() != reflect.Struct {
+		return WrongTypeError
+	}
+	body, err := request.Body()
+	if err != nil {
+		return err
+	}
+	bodyVal := reflect.ValueOf(body)
+	if bodyVal.Kind() != reflect.Slice {
+		return errors.New("Request bodies that are not array types cannot be unmarshalled to slice types")
+	}
+	for i := 0; i < bodyVal.Len(); i++ {
+		paramsFunc := func() (map[string]interface{}, error) {
+			params, ok := bodyVal.Index(i).Interface().(map[string]interface{})
+			if !ok {
+				return nil, errors.New("An element of the body array unmarshalled to a type other than map[string]interface{} and cannot be used as params.")
+			}
+			return params, nil
+		}
+		newElem := reflect.New(sliceElemType).Elem()
+		paramsTarget := newElem
+		if !sliceElemIsStructPtr {
+			paramsTarget = paramsTarget.Addr()
+		}
+		if err := request.unmarshalMapBody(paramsTarget, paramsFunc, replace); err != nil {
+			return err
+		}
+		sliceValue = reflect.Append(sliceValue, newElem)
+	}
+	targetValue.Elem().Set(sliceValue)
+	return nil
+}
+
 // unmarshal performes all of the logic for Unmarshal and
 // UnmarshalReplace.
-func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalErr error) {
-	targetValue := reflect.ValueOf(target)
-	if targetValue.Kind() != reflect.Ptr || targetValue.Elem().Kind() != reflect.Struct {
-		return errors.New("The value passed to Unmarshal must be a pointer to a struct")
-	}
+func (request *Request) unmarshalMapBody(targetValue reflect.Value, paramsFunc func() (map[string]interface{}, error), replace bool) (unmarshalErr error) {
+	target := targetValue.Interface()
 	targetValue = targetValue.Elem()
 
 	if preUnmarshaller, ok := target.(PreUnmarshaller); ok {
@@ -146,7 +195,7 @@ func (request *Request) unmarshal(target interface{}, replace bool) (unmarshalEr
 	// We allow Unmarshallers to handle types that aren't supported by this
 	// library, so wait to return an error from Params() until after we've
 	// checked if target is an Unmarshaler.
-	params, err := request.Params()
+	params, err := paramsFunc()
 	if unmarshaller, ok := target.(Unmarshaller); ok {
 		var body interface{} = params
 		if err != nil {
