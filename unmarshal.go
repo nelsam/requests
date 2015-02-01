@@ -476,6 +476,22 @@ func setValue(target, value reflect.Value, targetType reflect.Type, targetSetter
 		unmarshalToValue(value.Interface().(map[string]interface{}), target, replace)
 		return
 	}
+	if value.Kind() == reflect.Slice && targetType.Kind() == reflect.Slice {
+		target.Set(reflect.MakeSlice(targetType, 0, value.Len()))
+		for i := 0; i < value.Len(); i++ {
+			element := value.Index(i)
+			if element.Kind() == reflect.Interface {
+				element = element.Elem()
+			}
+			newTarget := reflect.New(targetType.Elem()).Elem()
+			err := setValue(newTarget, element, newTarget.Type(), newTarget.Set, fromRequest, replace)
+			if err != nil {
+				return err
+			}
+			target.Set(reflect.Append(target, newTarget))
+		}
+		return
+	}
 	inputType := value.Type()
 	if !inputType.ConvertibleTo(targetType) {
 		return fmt.Errorf("Cannot convert value of type %s to type %s",
