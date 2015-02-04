@@ -7,6 +7,11 @@ import (
 	"reflect"
 )
 
+var (
+	ErrRequiredMissing = errors.New("Required value has nil input")
+	ErrValueImmutable  = errors.New("Value is immutable once set")
+)
+
 // changeReceiver is just a clone of requests.ChangeReceiver, since we can't
 // import requests in this package.
 type changeReceiver interface {
@@ -55,8 +60,8 @@ func zeroOrEqual(orig, value interface{}) bool {
 // non-empty.
 func Required(orig, value interface{}, optionValue string) (interface{}, error) {
 	if optionValue == "true" {
-		if value == nil {
-			return nil, errors.New("Required value has nil input")
+		if value == nil || value == reflect.Zero(reflect.TypeOf(orig)).Interface() {
+			return nil, ErrRequiredMissing
 		}
 	}
 	return value, nil
@@ -81,7 +86,6 @@ func Default(orig, value interface{}, optionValue string) (interface{}, error) {
 // modified after being set.  It will return an error if orig is
 // non-empty and does not match the new value from the request.
 func Immutable(orig, value interface{}, optionValue string) (interface{}, error) {
-	immutableErr := errors.New("Value is immutable once set")
 	if optionValue == "true" {
 		if _, ok := orig.(receiver); ok {
 			return nil, errors.New("Receiver types cannot be immutable.  " +
@@ -94,11 +98,11 @@ func Immutable(orig, value interface{}, optionValue string) (interface{}, error)
 					return nil, err
 				}
 				if changed {
-					return nil, immutableErr
+					return nil, ErrValueImmutable
 				}
 				return value, nil
 			}
-			return nil, immutableErr
+			return nil, ErrValueImmutable
 		}
 	}
 	return value, nil
