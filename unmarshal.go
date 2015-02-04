@@ -125,6 +125,12 @@ func (request *Request) Unmarshal(target interface{}) error {
 }
 
 func (request *Request) unmarshal(target interface{}, replace bool) error {
+	defer func() {
+		// The unmarshal process drains request.params, so if it's
+		// called again for the same request, they will need to be
+		// recreated.
+		request.params = nil
+	}()
 	targetValue := reflect.ValueOf(target)
 	if targetValue.Kind() == reflect.Ptr {
 		switch targetValue.Elem().Kind() {

@@ -22,6 +22,31 @@ func SetMultipartMem(mem int64) {
 	multipartMem = mem
 }
 
+// deepSliceMSICopy creates a deep copy of a []interface{} or
+// map[string]interface{} which contains basic types and other
+// []interface{} and map[string]interface{} types as values.  Any type
+// other than map[string]interface{} and []interface{} will be
+// returned as-is.  As such, this is not good for copying maps or
+// slices that may contain pointers - it's mainly used for copying
+// unmarshalled json (or other formats of user input).
+func deepSliceMSICopy(v interface{}) interface{} {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		m := make(map[string]interface{})
+		for key, value := range t {
+			m[key] = deepSliceMSICopy(value)
+		}
+		v = m
+	case []interface{}:
+		s := make([]interface{}, 0, len(t))
+		for _, value := range t {
+			s = append(s, deepSliceMSICopy(value))
+		}
+		v = s
+	}
+	return v
+}
+
 // Body returns the result of ParseBody for this request.  ParseBody
 // will only be called the first time Body is called; subsequent calls
 // will return the same value as the first call.
@@ -33,7 +58,7 @@ func (request *Request) Body() (interface{}, error) {
 		}
 		request.body = body
 	}
-	return request.body, nil
+	return deepSliceMSICopy(request.body), nil
 }
 
 // SetBody allows you to assign a body (for example, unmarshalled json)
