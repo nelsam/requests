@@ -344,7 +344,7 @@ func unmarshalToValue(params map[string]interface{}, targetValue reflect.Value, 
 		if value.IsValid() {
 			optionValue = value.Interface()
 		}
-		newVal, inputErr := ApplyOptions(field, fieldValue.Interface(), optionValue)
+		newVal, inputErr := ApplyOptions(field, fieldValue.Interface(), optionValue, fromParams)
 		if parseErrs.Set(name, inputErr) {
 			continue
 		}

@@ -58,9 +58,9 @@ func zeroOrEqual(orig, value interface{}) bool {
 // Required is an option func that ensures a non-nil value was passed
 // along in the request.  It does not ensure that the value is
 // non-empty.
-func Required(orig, value interface{}, optionValue string) (interface{}, error) {
-	if optionValue == "true" {
-		if value == nil || value == reflect.Zero(reflect.TypeOf(orig)).Interface() {
+func Required(orig, value interface{}, fromRequest bool, optionValue string) (interface{}, error) {
+	if optionValue == "true" && !fromRequest {
+		if orig == reflect.Zero(reflect.TypeOf(orig)).Interface() {
 			return nil, ErrRequiredMissing
 		}
 	}
@@ -70,8 +70,8 @@ func Required(orig, value interface{}, optionValue string) (interface{}, error) 
 // Default is an option func that sets a default value for a field.
 // If the value doesn't exist in the request (or is nil), the provided
 // default will be used instead.
-func Default(orig, value interface{}, optionValue string) (interface{}, error) {
-	if value == nil {
+func Default(orig, value interface{}, fromRequest bool, optionValue string) (interface{}, error) {
+	if !fromRequest {
 		if optionValue != "" {
 			// This is a string type, but we'll leave it up to the
 			// unmarshal process (or the Receiver's Receive method) to
@@ -85,8 +85,8 @@ func Default(orig, value interface{}, optionValue string) (interface{}, error) {
 // Immutable is an option func that ensures that a value is not
 // modified after being set.  It will return an error if orig is
 // non-empty and does not match the new value from the request.
-func Immutable(orig, value interface{}, optionValue string) (interface{}, error) {
-	if optionValue == "true" {
+func Immutable(orig, value interface{}, fromRequest bool, optionValue string) (interface{}, error) {
+	if optionValue == "true" && fromRequest {
 		if _, ok := orig.(receiver); ok {
 			return nil, errors.New("Receiver types cannot be immutable.  " +
 				"See ChangeReceiver for a supported alternative.")

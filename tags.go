@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	registeredOptions = map[string]OptionFunc{
-		"required":  OptionFunc(options.Required),
-		"default":   OptionFunc(options.Default),
-		"immutable": OptionFunc(options.Immutable),
+	registeredOptions = map[string]InputOptionFunc{
+		"required":  InputOptionFunc(options.Required),
+		"default":   InputOptionFunc(options.Default),
+		"immutable": InputOptionFunc(options.Immutable),
 	}
 
 	optionDefaults map[string]string
@@ -111,12 +111,16 @@ func SetOptionDefault(option, value string) {
 // the final new value (parsed from the request value) and any errors encountered.
 type OptionFunc func(originalValue, requestValue interface{}, optionValue string) (convertedValue interface{}, err error)
 
+// An InputOptionFunc is an OptionFunc that also accepts a boolean -
+// whether or not requestValue is from a request.
+type InputOptionFunc func(originalValue, requestValue interface{}, fromRequest bool, optionValue string) (convertedValue interface{}, err error)
+
 type tagOption struct {
 	name  string
 	value string
 }
 
-func (option tagOption) function() OptionFunc {
+func (option tagOption) function() InputOptionFunc {
 	function, _ := registeredOptions[option.name]
 	return function
 }
@@ -147,7 +151,17 @@ func RegisterOption(name string, optionFunc OptionFunc) error {
 	if _, ok := registeredOptions[name]; ok {
 		return fmt.Errorf(`An OptionFunc is already registered for "%s"`, name)
 	}
-	registeredOptions[name] = optionFunc
+	registeredOptions[name] = func(orig, new interface{}, fromRequest bool, optionValue string) (interface{}, error) {
+		return optionFunc(orig, new, optionValue)
+	}
+	return nil
+}
+
+func RegisterInputOption(name string, inputOptionFunc InputOptionFunc) error {
+	if _, ok := registeredOptions[name]; ok {
+		return fmt.Errorf(`An OptionFunc is already registered for "%s"`, name)
+	}
+	registeredOptions[name] = inputOptionFunc
 	return nil
 }
 
@@ -155,14 +169,14 @@ func RegisterOption(name string, optionFunc OptionFunc) error {
 // with RegisterOption to a struct field.  If any of the OptionFuncs
 // return an error, the process will immediately return a nil value
 // and the returned error.
-func ApplyOptions(field reflect.StructField, orig, input interface{}) (value interface{}, optionErr error) {
+func ApplyOptions(field reflect.StructField, orig, input interface{}, fromRequest bool) (value interface{}, optionErr error) {
 	value = input
 	for _, option := range tagOptions(field) {
-		optionFunc := option.function()
-		if optionFunc == nil {
+		inputOptionFunc := option.function()
+		if inputOptionFunc == nil {
 			return nil, fmt.Errorf(`Could not find a registered OptionFunc for option "%s"`, option.name)
 		}
-		if value, optionErr = optionFunc(orig, value, option.value); optionErr != nil {
+		if value, optionErr = inputOptionFunc(orig, value, fromRequest, option.value); optionErr != nil {
 			return nil, optionErr
 		}
 	}
