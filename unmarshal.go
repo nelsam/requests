@@ -489,7 +489,7 @@ func setValue(target, value reflect.Value, targetType reflect.Type, targetSetter
 		}
 	}
 
-	if target.Interface() == value.Interface() {
+	if reflect.DeepEqual(target.Interface(), value.Interface()) {
 		return nil
 	}
 
