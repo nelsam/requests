@@ -92,7 +92,7 @@ func Default(orig, value interface{}, fromRequest bool, optionValue string) (int
 		if fromRequest {
 			useDefault = value == nil
 		} else {
-			useDefault = orig == reflect.Zero(reflect.TypeOf(orig)).Interface()
+			useDefault = orig == nil || orig == reflect.Zero(reflect.TypeOf(orig)).Interface()
 		}
 		if useDefault {
 			return optionValue, nil
