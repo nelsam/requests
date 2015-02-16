@@ -59,23 +59,42 @@ func zeroOrEqual(orig, value interface{}) bool {
 // along in the request.  It does not ensure that the value is
 // non-empty.
 func Required(orig, value interface{}, fromRequest bool, optionValue string) (interface{}, error) {
-	if optionValue == "true" && !fromRequest {
-		if orig == reflect.Zero(reflect.TypeOf(orig)).Interface() {
-			return nil, ErrRequiredMissing
+	if optionValue == "true" {
+		if fromRequest {
+			if value == nil || value == reflect.Zero(reflect.TypeOf(orig)).Interface() {
+				return nil, ErrRequiredMissing
+			}
+		} else {
+			if orig == reflect.Zero(reflect.TypeOf(orig)).Interface() {
+				return nil, ErrRequiredMissing
+			}
 		}
 	}
 	return value, nil
 }
 
 // Default is an option func that sets a default value for a field.
-// If the value doesn't exist in the request (or is nil), the provided
-// default will be used instead.
+// If its value is non-empty, it will use the following logic to
+// decide what to return:
+//
+// If fromRequest is false, then the default will be returned if orig
+// is equal to its zero value.
+//
+// If fromRequest is true, then the default will be returned if value
+// is nil.
+//
+// In all other cases, value will be returned.
 func Default(orig, value interface{}, fromRequest bool, optionValue string) (interface{}, error) {
-	if !fromRequest {
-		if optionValue != "" {
-			// This is a string type, but we'll leave it up to the
-			// unmarshal process (or the Receiver's Receive method) to
-			// convert it.
+	if optionValue != "" {
+		// optionValue is always a string type, but we'll leave it up
+		// to the calling code to perform conversion to orig's type.
+		useDefault := false
+		if fromRequest {
+			useDefault = value == nil
+		} else {
+			useDefault = orig == reflect.Zero(reflect.TypeOf(orig)).Interface()
+		}
+		if useDefault {
 			return optionValue, nil
 		}
 	}
