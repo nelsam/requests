@@ -1,6 +1,7 @@
 package requests
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"reflect"
@@ -468,6 +469,8 @@ func callReceivers(target reflect.Value, value interface{}) (receiverFound bool,
 	return
 }
 
+var sqlScannerImpl = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+
 // setValue takes a target and a value, and updates the target to
 // match the value.  targetSetter should be target.Set for any settable
 // values, but can perform other logic for situations such as unexported
@@ -541,6 +544,19 @@ func setValue(target, value reflect.Value, targetType reflect.Type, targetSetter
 		}
 		return
 	}
+
+	impl := targetType.Implements(sqlScannerImpl)
+	if !impl && target.CanAddr() {
+		impl = target.Addr().Type().Implements(sqlScannerImpl)
+		if impl {
+			target = target.Addr()
+		}
+	}
+	if impl {
+		// this is a type that implements sql.Scanner. Scan into it.
+		return target.Interface().(sql.Scanner).Scan(value.Interface())
+	}
+
 	inputType := value.Type()
 	if !inputType.ConvertibleTo(targetType) {
 		return fmt.Errorf("Cannot convert value of type %s to type %s",
